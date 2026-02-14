@@ -7,6 +7,7 @@ import uvicorn
 from aiorwlock import RWLock
 from fastapi import FastAPI, HTTPException
 import valkey.asyncio as valkey
+from fastapi.middleware.cors import CORSMiddleware
 
 
 REP_STEP = 0.1
@@ -45,6 +46,14 @@ async def main():
     ## HASH IS A HEX-ENCODED SHA256 HASH OF THE MEDIA IN QUESTION
 
     UPDATE_LOCK = RWLock()
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     @app.get("/{hash}")
     async def get_reputation(hash: str) -> ReputationReturnType:
