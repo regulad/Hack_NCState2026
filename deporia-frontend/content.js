@@ -76,7 +76,11 @@ async function doReportUnderCursor(trust, coords) {
     await Promise.all(
       candidateHashes.map(buf2hex).map(definitelyString => bump_rep(definitelyString, trust))
     );
-    alert("All done! Thank you for your submission!");
+    if (candidateHashes.length > 0) {
+      alert("All done! Thank you for your submission!");
+    } else {
+      alert("Didn't find anything to submit.")
+    }
   } catch (error) {
     console.error("error when handling RPC!", error.stack);
     alert("Your submission was not successful.");
