@@ -5,37 +5,34 @@ function buf2hex(buffer) { // buffer is an ArrayBuffer
       .join('');
 }
 
-const API_DOMAIN = "https://bubblier-subconcavely-frida.ngrok-free.dev"
 const SIGNIFICANT_IMG_SIZE = 128 // images below this size on both axis aren't checked
 
-async function bump_rep(sha, trust) {
-  const request = new Request(`${API_DOMAIN}/${sha}`, {
-    method: "PUT",
-    headers: new Headers([
-      ["Ngrok-Skip-Browser-Warning", "yes"],
-      ["Content-Type", "application/json"]
-    ]),
-    body: JSON.stringify({"trust": trust}),
-  });
-  const response = await fetch(request);
-  if (!response.ok) {
-    const errorBody = await response.text(); 
-    throw new Error(`HTTP error! status: ${response.status}, message: ${errorBody}`);
+// IPC wrappers
+async function bumpRep(sha, trust) {
+  const response = await browser.runtime.sendMessage({ action: "bumpRep", params: [sha, trust] });
+  if (response.data !== undefined) {
+    return response.data;
+  } else {
+    throw new Error("bad IPC");
   }
 }
 
-async function fetch_rep(sha) {
-  const request = new Request(`${API_DOMAIN}/${sha}`, {
-    method: "GET",
-    headers: new Headers([["Ngrok-Skip-Browser-Warning", "yes"]])
-  });
-  const response = await fetch(request);
-  if (!response.ok) {
-    const errorBody = await response.text(); 
-    throw new Error(`HTTP error! status: ${response.status}, message: ${errorBody}`);
+async function fetchRep(sha) {
+  const response = await browser.runtime.sendMessage({ action: "fetchRep", params: [sha] });
+  if (response.data !== undefined) {
+    return response.data;
+  } else {
+    throw new Error("bad IPC");
   }
-  return await response.text().then(JSON.parse).then(parsed => parsed.reputation);
-  // TODO: response validation to see if it is a float value clamped between 0 and 1
+}
+
+async function tryGetCorsBypass(url) {
+  const response = await browser.runtime.sendMessage({ action: "tryGetCorsBypass", params: [url] });
+  if (response.data !== undefined) {
+    return response.data;
+  } else {
+    throw new Error("bad IPC");
+  }
 }
 
 // TODO: detect images, canvases (not by us) and divs with background styles inserted into DOM for overlay
@@ -78,7 +75,7 @@ async function doReportUnderCursor(trust, coords) {
     const candidateBuffersMaybe = await Promise.all(candidateElements.map(getHashOrNull));
     const candidateHashes = candidateBuffersMaybe.filter(maybeString => maybeString !== null);
     await Promise.all(
-      candidateHashes.map(buf2hex).map(definitelyString => bump_rep(definitelyString, trust))
+      candidateHashes.map(buf2hex).map(definitelyString => bumpRep(definitelyString, trust))
     );
     if (candidateHashes.length > 0) {
       alert("All done! Thank you for your submission!");
@@ -91,10 +88,30 @@ async function doReportUnderCursor(trust, coords) {
   }
 }
 
+const urlRegex = /^https?:\/\/.+/i;
+
 async function panicGetHashOrNull(src) {
+  // src type of string
   // we failed to get the url normally, we need to do a CORS bypass to get the bytes of this image
-  // TODO
-  console.debug("got a url we can't handle yet:", src);
+  // step 1: check to see if it is a data: url
+  if (!src.startsWith("data:") && urlRegex.test(src)) {
+    // non-data but fetchable URL blocked by CORS.
+    // background script transformation may work.
+    src = await tryGetCorsBypass(src) || src;
+  }
+
+  if (src.startsWith("data:")) {
+    // we got an easy one!
+    const base64 = src.split(',')[1];
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return await crypto.subtle.digest("SHA-256", bytes);
+  }
+
+  console.warn("got a weird URI we can't handle yet:", src);
   return null;
 }
 
@@ -128,7 +145,7 @@ async function getHashOrNull(element) {
     if (!maybeUrl) {
       return null; // probably just a gradient or similar
     }
-    return await panicGetHashOrNull(maybeUrl);
+    return await panicGetHashOrNull(maybeUrl[1]);
   } else {
     // no idea what this is lol
     return null;
@@ -185,7 +202,10 @@ async function handleElement(element) {
     return;
   }
 
+  const hexHash = buf2hex(maybeNull);
+  const imageReputation = await fetchRep(hexHash);
+
   // we have an element relevant to us
-  console.debug("interesting element...");
-  // TODO
+  console.debug("interesting element...", element, hexHash, imageReputation);
+  // TODO: add element with reputation
 }
