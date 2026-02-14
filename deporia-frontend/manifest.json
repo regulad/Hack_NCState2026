@@ -1,0 +1,20 @@
+{
+  "description": "Deporia flags content embedded in webpages likely to be AI-generated or manipulated with a warning icon. AI manipulation reports are submitted by users, and tracked using a backend. Data is stored in Valkey, ensuring fast read/writes and access by image/frame hash.",
+  "manifest_version": 3,
+  "name": "Deporia",
+  "version": "0.1",
+  "homepage_url": "https://www.deporia.tech",
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": ["content.js"]
+    }
+  ],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "permissions": ["contextMenus", "activeTab"]
+}
