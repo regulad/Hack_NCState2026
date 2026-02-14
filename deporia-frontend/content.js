@@ -10,14 +10,16 @@ const API_DOMAIN = "https://bubblier-subconcavely-frida.ngrok-free.dev"
 async function bump_rep(sha, trust) {
   const request = new Request(`${API_DOMAIN}/${sha}`, {
     method: "PUT",
-    headers: new Headers([["Ngrok-Skip-Browser-Warning", "yes"]]),
-    body: {
-      "trust": trust,
-    },
+    headers: new Headers([
+      ["Ngrok-Skip-Browser-Warning", "yes"],
+      ["Content-Type", "application/json"]
+    ]),
+    body: JSON.stringify({"trust": trust}),
   });
   const response = await fetch(request);
   if (!response.ok) {
-    alert("Failed to submit your report! Please report this bug.");
+    const errorBody = await response.text(); 
+    throw new Error(`HTTP error! status: ${response.status}, message: ${errorBody}`);
   }
 }
 
@@ -28,7 +30,8 @@ async function fetch_rep(sha) {
   });
   const response = await fetch(request);
   if (!response.ok) {
-    alert("Failed to submit your report! Please report this bug.");
+    const errorBody = await response.text(); 
+    throw new Error(`HTTP error! status: ${response.status}, message: ${errorBody}`);
   }
   return await response.text().then(JSON.parse).then(parsed => parsed.reputation);
   // TODO: response validation to see if it is a float value clamped between 0 and 1
