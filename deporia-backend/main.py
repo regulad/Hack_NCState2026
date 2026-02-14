@@ -1,5 +1,5 @@
 def main():
-    print("Hello from deporia-frontend!")
+    print("Hello from deporia-backend!")
 
 
 if __name__ == "__main__":
