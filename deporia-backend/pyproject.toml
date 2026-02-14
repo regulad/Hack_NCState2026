@@ -3,5 +3,10 @@ name = "deporia-backend"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.10"
-dependencies = []
+requires-python = ">=3.13"
+dependencies = [
+    "aiorwlock>=1.5.0",
+    "fastapi[standard]>=0.129.0",
+    "uvicorn>=0.40.0",
+    "valkey[libvalkey]>=6.1.1",
+]
