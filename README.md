@@ -6,5 +6,4 @@ Please visit [the GitHub pages site](https://regulad.github.io/Hack_NCState2026)
 
 Posted on [DevPost](https://devpost.com/software/deporia?ref_content=user-portfolio&ref_feature=in_progress).
 
-Deporia flags content embedded in webpages likely to be AI-generated or manipulated with a warning border. AI manipulation reports are submitted by users, and tracked using our backend. Data is stored in Valkey, ensuring fast read/writes and access by image hash.
-
+Deporia is a web extension intended for the non-tech savvy that identifies AI-generated pictures. Users see a simple red or green border on all loaded images, and can "vote" by right clicking on the image to bump the reputation of the image.
