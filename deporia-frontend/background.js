@@ -29,10 +29,11 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
 })
 
 // incoming IPC
-async function fetchRep(sha) {
+async function fetchRep(sha, force) {
   const request = new Request(`${API_DOMAIN}/${sha}`, {
     method: "GET",
-    headers: new Headers([["Ngrok-Skip-Browser-Warning", "yes"]])
+    headers: new Headers([["Ngrok-Skip-Browser-Warning", "yes"]]),
+    cache: !!force ? "reload" : undefined,
   });
   const response = await fetch(request);
   if (!response.ok) {
@@ -58,6 +59,7 @@ async function bumpRep(sha, trust) {
     const errorBody = await response.text(); 
     throw new Error(`HTTP error! status: ${response.status}, message: ${errorBody}`);
   }
+  return true; // no return type
 }
 
 // written by claude
@@ -106,7 +108,7 @@ browser.runtime.onMessage.addListener((request, sender) => {
     case "fetchRep":
       return fetchRep(...request.params).then(value => ({ data: value }));
     case "bumpRep":
-      return fetchRep(...request.params).then(value => ({ data: value }));
+      return bumpRep(...request.params).then(value => ({ data: value }));
     case "tryGetCorsBypass":
       return tryGetCorsBypass(...request.params).then(value => ({ data: value }));
     default:

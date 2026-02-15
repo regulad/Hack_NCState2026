@@ -6,6 +6,7 @@ from typing import TypedDict
 import uvicorn
 from aiorwlock import RWLock
 from fastapi import FastAPI, HTTPException
+from fastapi import Response
 import valkey.asyncio as valkey
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -56,12 +57,16 @@ async def main():
     )
 
     @app.get("/{hash}")
-    async def get_reputation(hash: str) -> ReputationReturnType:
+    async def get_reputation(hash: str, response: Response) -> ReputationReturnType:
         if not re.fullmatch(r"[0-9a-fA-F]{64}", hash):
             raise HTTPException(
                 status_code=400,
                 detail="Hash must be a 64-character hexadecimal string.",
             )
+    
+        # Set cache header
+        response.headers["Cache-Control"] = "public, max-age=300"
+        
         async with UPDATE_LOCK.reader:
             current_rep = float(await valkey_client.get(hash) or START_REP)
             return {

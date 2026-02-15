@@ -17,7 +17,7 @@ async function bumpRep(sha, trust) {
   }
 }
 
-async function fetchRep(sha) {
+async function fetchRep(sha, force) {
   const response = await browser.runtime.sendMessage({ action: "fetchRep", params: [sha] });
   if (response.data !== undefined) {
     return response.data;
@@ -73,16 +73,21 @@ async function doReportUnderCursor(trust, coords) {
   try {
     const candidateElements = getAllElementsAtPoint(coords.x, coords.y);
     const candidateBuffersMaybe = await Promise.all(candidateElements.map(getHashOrNull));
-    const candidateHashes = candidateBuffersMaybe.filter(maybeString => maybeString !== null);
+    const confirmedCandidateBuffers = candidateBuffersMaybe.filter(maybeString => maybeString !== null);
+    const candidateHexHashes = confirmedCandidateBuffers.map(buf2hex);
     await Promise.all(
-      candidateHashes.map(buf2hex).map(definitelyString => bumpRep(definitelyString, trust))
+      candidateHexHashes.map(definitelyString => bumpRep(definitelyString, trust))
     );
-    if (candidateHashes.length > 0) {
+    if (candidateHexHashes.length > 0) {
       alert("All done! Thank you for your submission!");
     } else {
-      alert("Didn't find anything to submit.")
+      alert("Didn't find anything to submit.");
+      return;
     }
     // enqueue refreshing
+    await Promise.all(
+      candidataeHexHashes.map(definitelyString => fetchRep(definitelyString, true))
+    );
     await Promise.all(
       candidateElements.map(handleElement)
     );
@@ -173,31 +178,58 @@ browser.runtime.onMessage.addListener((request, sender) => {
     }
 });
 
-// mutation handler
-// Create the observer
-const observer = new MutationObserver((mutations) => {
+// this solution is hacky, but it works. we lean on browser cache to not ruin everything
+////// START CLAUDE
+// Intersection Observer - catches elements as they scroll into view
+const intersectionObserver = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => {
+    if (entry.isIntersecting) {
+      handleElement(entry.target);
+    }
+  });
+}, {
+  rootMargin: '300px',
+  threshold: 0.01
+});
+
+// Mutation observer adds new elements to intersection observer
+const mutationObserver = new MutationObserver((mutations) => {
   mutations.forEach((mutation) => {
+    // Check all added nodes
     mutation.addedNodes.forEach((node) => {
-      // Only process element nodes (not text nodes, comments, etc.)
       if (node.nodeType === Node.ELEMENT_NODE) {
         handleElement(node);
-        
-        // Also check for nested elements within the added node
-        const descendants = node.querySelectorAll('*');
-        descendants.forEach(handleElement);
+        intersectionObserver.observe(node);
+        node.querySelectorAll('*').forEach(el => {
+          handleElement(el);
+          intersectionObserver.observe(el);
+        });
       }
     });
+    
+    // On attribute changes, re-scan descendants
+    if (mutation.type === 'attributes' && mutation.target.nodeType === Node.ELEMENT_NODE) {
+      handleElement(mutation.target);
+      mutation.target.querySelectorAll('*').forEach(el => {
+        handleElement(el);
+        intersectionObserver.observe(el);
+      });
+    }
   });
 });
 
-// Start observing
-observer.observe(document.documentElement, {
+mutationObserver.observe(document.body, {
   childList: true,
-  subtree: true
+  subtree: true,
+  attributes: true
 });
 
-// Handle existing elements on page load
-document.querySelectorAll('*').forEach(handleElement);
+// Initial setup
+document.querySelectorAll('*').forEach(el => {
+  handleElement(el);
+  intersectionObserver.observe(el);
+});
+////// END CLAUDE
 
 async function handleElement(element) {
   // see if a element is supported by it
@@ -209,64 +241,16 @@ async function handleElement(element) {
   const hexHash = buf2hex(maybeNull);
   const imageReputation = await fetchRep(hexHash);
 
-  // console.debug("interesting element...", element, hexHash, imageReputation);
   doOverlay(element, imageReputation);
 }
 
-// written by claude
 function doOverlay(element, reputation) {
-  // Remove any existing deporia classes
-  const existingClasses = Array.from(element.classList)
-    .filter(cls => cls.startsWith('deporia-'));
-  existingClasses.forEach(cls => element.classList.remove(cls));
-  
-  // Generate a unique class name with random hex ID
-  const randomHex = Math.floor(Math.random() * 0xFFFFFF)
-    .toString(16)
-    .toUpperCase()
-    .padStart(6, '0');
-  const uniqueClass = `deporia-${randomHex}`;
-  
-  // Add the class to the element
-  element.classList.add(uniqueClass);
-  
-  // Calculate color based on reputation (0 = red, 1 = green)
   const red = Math.round(255 * (1 - reputation));
   const green = Math.round(255 * reputation);
-  const bgColor = `rgb(${red}, ${green}, 0)`;
-  
-  // Format reputation as percentage
-  const reputationText = `${Math.round(reputation * 100)}%`;
-  
-  // Inject CSS for the pseudo-element
-  const style = document.createElement('style');
-  style.textContent = `
-  .${uniqueClass} {
-    position: relative !important;
-  }
-  .${uniqueClass}::before {
-    content: "${reputationText}" !important;
-    position: absolute !important;
-    top: 8px !important;
-    right: 8px !important;
-    background: ${bgColor} !important;
-    color: white !important;
-    padding: 4px 8px !important;
-    font-size: 12px !important;
-    font-weight: bold !important;
-    font-family: system-ui, -apple-system, sans-serif !important;
-    border-radius: 4px !important;
-    z-index: 2147483647 !important;
-    pointer-events: none !important;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
-    display: block !important;
-  }
-  `;
-  document.head.appendChild(style);
-  
-  // Ensure the element has position context
-  const computedStyle = getComputedStyle(element);
-  if (computedStyle.position === 'static') {
-    element.style.position = 'relative';
-  }
+  const color = `rgb(${red}, ${green}, 0)`;
+
+  element.style.border = `4px solid ${color}`;
+  element.style.boxSizing = 'border-box';
+
+  element.dataset.reputation = reputation;
 }
