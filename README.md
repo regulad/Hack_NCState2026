@@ -32,7 +32,7 @@ If you haven't installed the extension, here are some examples of what an annota
 
 ## Video Demo
 
-TODO
+<iframe width="560" height="315" src="https://www.youtube.com/embed/Z44jF96xDm0?si=VdpulBLg1cv5lO7E" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 ## Inspiration
 
