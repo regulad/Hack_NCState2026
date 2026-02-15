@@ -20,10 +20,10 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
   const { data: mousePos } =  await browser.tabs.sendMessage(tab.id, { action: "getMenuCoords" });
   switch (info.menuItemId) {
     case "ai-report":
-      await doReportUnderCursor(false, mousePos);
+      await doReportUnderCursor(tab, false, mousePos);
       break;
     case "human-report":
-      await doReportUnderCursor(true, mousePos);
+      await doReportUnderCursor(tab, true, mousePos);
       break;
   }
 })
@@ -60,9 +60,31 @@ async function bumpRep(sha, trust) {
   }
 }
 
+// written by claude
 async function tryGetCorsBypass(url) {
-  // TODO: try to return a base64 URL of the URL
-  return null;
+  try {
+    // Fetch the image using extension permissions (bypasses CORS)
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      console.error(`Failed to fetch ${url}: ${response.status}`);
+      return null;
+    }
+    
+    // Get the image as a blob
+    const blob = await response.blob();
+    
+    // Convert blob to base64 data URL
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result); // Returns "data:image/png;base64,..."
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error('Error fetching image:', error);
+    return null;
+  }
 }
 
 // ipc object:
@@ -75,7 +97,7 @@ async function tryGetCorsBypass(url) {
 // - data
 
 // outgoing IPC
-async function doReportUnderCursor(trust, coords) {
+async function doReportUnderCursor(tab, trust, coords) {
   await browser.tabs.sendMessage(tab.id, { action: "doReportUnderCursor", params: [trust, coords] });
 }
 

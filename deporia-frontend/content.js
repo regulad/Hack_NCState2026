@@ -82,6 +82,10 @@ async function doReportUnderCursor(trust, coords) {
     } else {
       alert("Didn't find anything to submit.")
     }
+    // enqueue refreshing
+    await Promise.all(
+      candidateElements.map(handleElement)
+    );
   } catch (error) {
     console.error("error when handling RPC!", error.stack);
     alert("Your submission was not successful.");
@@ -205,7 +209,64 @@ async function handleElement(element) {
   const hexHash = buf2hex(maybeNull);
   const imageReputation = await fetchRep(hexHash);
 
-  // we have an element relevant to us
-  console.debug("interesting element...", element, hexHash, imageReputation);
-  // TODO: add element with reputation
+  // console.debug("interesting element...", element, hexHash, imageReputation);
+  doOverlay(element, imageReputation);
+}
+
+// written by claude
+function doOverlay(element, reputation) {
+  // Remove any existing deporia classes
+  const existingClasses = Array.from(element.classList)
+    .filter(cls => cls.startsWith('deporia-'));
+  existingClasses.forEach(cls => element.classList.remove(cls));
+  
+  // Generate a unique class name with random hex ID
+  const randomHex = Math.floor(Math.random() * 0xFFFFFF)
+    .toString(16)
+    .toUpperCase()
+    .padStart(6, '0');
+  const uniqueClass = `deporia-${randomHex}`;
+  
+  // Add the class to the element
+  element.classList.add(uniqueClass);
+  
+  // Calculate color based on reputation (0 = red, 1 = green)
+  const red = Math.round(255 * (1 - reputation));
+  const green = Math.round(255 * reputation);
+  const bgColor = `rgb(${red}, ${green}, 0)`;
+  
+  // Format reputation as percentage
+  const reputationText = `${Math.round(reputation * 100)}%`;
+  
+  // Inject CSS for the pseudo-element
+  const style = document.createElement('style');
+  style.textContent = `
+  .${uniqueClass} {
+    position: relative !important;
+  }
+  .${uniqueClass}::before {
+    content: "${reputationText}" !important;
+    position: absolute !important;
+    top: 8px !important;
+    right: 8px !important;
+    background: ${bgColor} !important;
+    color: white !important;
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    font-weight: bold !important;
+    font-family: system-ui, -apple-system, sans-serif !important;
+    border-radius: 4px !important;
+    z-index: 2147483647 !important;
+    pointer-events: none !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+    display: block !important;
+  }
+  `;
+  document.head.appendChild(style);
+  
+  // Ensure the element has position context
+  const computedStyle = getComputedStyle(element);
+  if (computedStyle.position === 'static') {
+    element.style.position = 'relative';
+  }
 }
