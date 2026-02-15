@@ -18,7 +18,7 @@ async function bumpRep(sha, trust) {
 }
 
 async function fetchRep(sha, force) {
-  const response = await browser.runtime.sendMessage({ action: "fetchRep", params: [sha] });
+  const response = await browser.runtime.sendMessage({ action: "fetchRep", params: [sha, force] });
   if (response.data !== undefined) {
     return response.data;
   } else {
@@ -86,7 +86,7 @@ async function doReportUnderCursor(trust, coords) {
     }
     // enqueue refreshing
     await Promise.all(
-      candidataeHexHashes.map(definitelyString => fetchRep(definitelyString, true))
+      candidateHexHashes.map(definitelyString => fetchRep(definitelyString, true))
     );
     await Promise.all(
       candidateElements.map(handleElement)

@@ -33,7 +33,7 @@ async function fetchRep(sha, force) {
   const request = new Request(`${API_DOMAIN}/${sha}`, {
     method: "GET",
     headers: new Headers([["Ngrok-Skip-Browser-Warning", "yes"]]),
-    cache: !!force ? "reload" : undefined,
+    cache: !!force ? "reload" : "default",
   });
   const response = await fetch(request);
   if (!response.ok) {
